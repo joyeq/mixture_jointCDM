@@ -1,0 +1,112 @@
+model
+{
+  for (n in 1:N) {
+  for (i in 1:I) {
+ for (k in 1:K) {
+        w[n, i, k] <- pow(alpha[n, k], Q[i, k])
+      }
+ #item response --- LCDM 
+  Score[n,i] ~ dbern(prob[n,i,D[n,i]+1])
+
+ #response time probability --- lognormal
+    logT[n,i] ~ dnorm(mu[n,i,D[n,i]+1], omega[D[n,i]+1])
+    mu[n,i,2]<-zeta[i] - tau[n]
+    mu[n,i,1]<-muC
+    logit(prob[n,i,2]) <- beta[i] + delta[i] * prod(w[n, i, ])
+    prob[n,i,1] <- g
+    }
+ }
+
+#higher-order model for attributes
+  for (n in 1:N) {
+    for (k in 1:K) {
+      logit(att_prob[n, k]) <- lambda_K[k] * theta[n] - lambda_0[k]
+      alpha[n, k] ~ dbern(att_prob[n, k])
+    }
+  }
+  for (n in 1:N) {
+    person_parameter[n, 1:2] ~ dmnorm(person_mu[1:2], person_den[1:2, 1:2]) 
+    theta[n] <- person_parameter[n, 1]
+    tau[n] <- person_parameter[n, 2] 
+   
+  }
+#prior specifications
+#engagement groups
+  for(n in 1:N){
+  for(i in 1:I){
+  D[n,i]~dbern(prob_solv)
+}
+}
+prob_solv~dbeta(1,1)
+
+ for (k in 1:K) {
+    lambda_0[k] ~ dnorm(0.00000E+00, 0.25)
+    lambda_K[k] ~ dnorm(0.00000E+00, 0.25)  T(0.00000E+00, )
+  }
+
+  person_mu[1] <- 0.00000E+00
+  person_mu[2] <- 0.00000E+00
+
+  L_theta[1, 1] <- 1
+  L_theta[2, 2] ~ dgamma(1, 1)
+  L_theta[2, 1] ~ dnorm(0, 1)
+  L_theta[1, 2] <- 0.00000E+00
+ 
+  sigma_person <- L_theta %*% t(L_theta)
+  person_den[1:2, 1:2] <- inverse(sigma_person[1:2, 1:2])
+
+    omega[1]<-omegaD
+    omega[2]<-omegaE
+    omegaE ~ dgamma(1, 1)
+    omegaD ~ dgamma(1, 1)
+    sigmaE <- 1/omegaE
+    sigmaD <- 1/omegaD
+   
+  
+    muC~dnorm(0,0.1)
+     g~dbeta(1,1)
+   for (i in 1:I) {
+    itemparameter[i, 1:3] ~ dmnorm(item_mu[1:3], item_den[1:3, 1:3])
+                                                         
+    beta[i] <- itemparameter[i, 1]
+    delta[i] <- itemparameter[i, 2]
+    zeta[i] <- itemparameter[i, 3]
+
+  
+  }
+  item_mu[1] ~ dnorm(-2.197, 0.5)
+  item_mu[2] ~ dnorm(4.394, 0.5)T(0,)
+  item_mu[3] ~ dnorm(4,0.5)
+  R[1, 1] <- 1
+  R[2, 2] <- 1
+  R[3, 3] <- 1
+  R[1, 2] <- 0.00000E+00
+  R[1, 3] <- 0.00000E+00
+  R[2, 1] <- 0.00000E+00
+  R[2, 3] <- 0.00000E+00
+  R[3, 1] <- 0.00000E+00
+  R[3, 2] <- 0.00000E+00
+  item_den[1:3, 1:3] ~ dwish(R[1:3, 1:3], 3)
+  sigma_item[1:3, 1:3] <- inverse(item_den[1:3, 1:3])
+  
+for ( i in 1:2){
+  sd_person[i]<-sqrt(sigma_person[i,i])
+}
+  for (i in 1:2){
+  for (j in 1:2){
+ Rho[i,j]<-(sigma_person[i,j]/(sd_person[i]* sd_person[j]))
+}
+}
+ #PPMC
+  for(n in 1:N){
+    for(i in 1:I){  
+    Score_rep1[n, i] ~ dbern(prob[n, i,D[n,i]+1])
+    Score_rep[n, i]<-ifelse(totna[n,i]==0,Score_rep1[n, i],0)
+    Score_obs[n, i]<-ifelse(totna[n,i]==0,Score[n, i],0)
+    logT_rep[n,i] ~ dnorm(mu[n,i,D[n,i]+1], omega[D[n,i]+1])
+    }
+}
+  pvalue_0 <- sum(Score_obs)>=sum(Score_rep)	
+  pvalue_rt <- sum(logT)>=sum(logT_rep)
+  
+}

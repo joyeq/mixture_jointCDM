@@ -1,0 +1,84 @@
+model
+{
+  for (n in 1:N) {
+    for (i in 1:I) {
+      for (k in 1:K) {
+        w[n, i, k] <- pow(alpha[n, k], Q[i, k])
+      }
+      logit(prob[n, i]) <- beta[i] + delta[i] * prod(w[n, i, ])
+      Score[n, i] ~ dbern(prob[n, i])
+      logT[n, i] ~ dnorm(zeta[i] - tau[n], omiga)
+    }
+  }
+  for (n in 1:N) {
+    for (k in 1:K) {
+      logit(att_prob[n, k]) <- lambda_K[k] * theta[n] - lambda_0[k]
+      alpha[n, k] ~ dbern(att_prob[n, k])
+    }
+  }
+  for (n in 1:N) {
+    person_parameter[n, 1:2] ~ dmnorm(person_mu[1:2], person_den[1:2, 1:2]) 
+    theta[n] <- person_parameter[n, 1]    tau[n] <- person_parameter[n, 2]  
+  }
+  for (i in 1:I) {
+    itemparameter[i, 1:3] ~ dmnorm(item_mu[1:3], item_den[1:3, 1:3])
+                                                         
+    beta[i] <- itemparameter[i, 1]
+    delta[i] <- itemparameter[i, 2]
+    zeta[i] <- itemparameter[i, 3]
+
+    logit(g[i]) <- beta[i]
+    logit(ns[i]) <- beta[i] + delta[i]
+    s[i] <- 1 - ns[i]
+  }
+  for (k in 1:K) {
+    lambda_0[k] ~ dnorm(0.00000E+00, 0.25)
+    lambda_K[k] ~ dnorm(0.00000E+00, 0.25)  T(0.00000E+00, )
+  }
+    omiga ~ dgamma(1, 1)
+    Sigma_omiga <- 1/omiga
+
+  person_mu[1] <- 0.00000E+00
+  person_mu[2] <- 0.00000E+00
+  L_theta[1, 1] <- 1
+  L_theta[2, 2] ~ dgamma(1, 1)
+  L_theta[2, 1] ~ dnorm(0, 1)
+  L_theta[1, 2] <- 0.00000E+00
+  sigma_theta <- L_theta %*% t(L_theta)
+  person_den[1:2, 1:2] <- inverse(sigma_theta[1:2, 1:2])
+  
+ 
+  item_mu[1] ~ dnorm(-2.197, 0.5)
+  item_mu[2] ~ dnorm(4.394, 0.5)T(0,)
+  item_mu[3] ~ dnorm(4,0.5)
+  R[1, 1] <- 1
+  R[2, 2] <- 1
+  R[3, 3] <- 1
+  R[1, 2] <- 0.00000E+00
+  R[1, 3] <- 0.00000E+00
+  R[2, 1] <- 0.00000E+00
+  R[2, 3] <- 0.00000E+00
+  R[3, 1] <- 0.00000E+00
+  R[3, 2] <- 0.00000E+00
+  item_den[1:3, 1:3] ~ dwish(R[1:3, 1:3], 3)
+  sigma_item[1:3, 1:3] <- inverse(item_den[1:3, 1:3])
+  
+  
+  #PPMC
+  for(n in 1:N){
+    for(i in 1:I){
+      response_rep[n,i]~dbern(prob[n,i])
+      D_rt[n,i]<-pow((logT[n,i]-zeta[i] + tau[n])/Sigma_omiga,2)
+      rt_rep[n,i]~dnorm(zeta[i] - tau[n], omiga)
+      D_rep_rt[n,i]<-pow((rt_rep[n,i]-zeta[i] + tau[n])/Sigma_omiga,2)
+      teststat[n, i] <- pow(Score[n, i] - prob[n, i],2)/(prob[n, i] * (1 - prob[n, i]))
+      teststat_rep[n, i] <- pow(response_rep[n, i] - prob[n, i], 2)/(prob[n, i] * (1 - prob[n, i]))	
+    }}
+
+  D_rt_sum<-sum(D_rt[,])
+  D_rep_rt_sum<-sum(D_rep_rt[,])
+  teststatsum <- sum(teststat[, ])	
+  teststatsum_rep <- sum(teststat_rep[, ])	
+  pvalue_0<- step(teststatsum_rep - teststatsum)	
+  pvalue_rt<- step(D_rep_rt_sum-D_rt_sum)
+}
